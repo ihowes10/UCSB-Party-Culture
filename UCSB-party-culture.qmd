@@ -1,0 +1,416 @@
+---
+title: 'Final Project'
+subtitle: "PSTAT122: Design and Analysis of Experiments"
+
+author:
+  - name: "Winter 2026"
+affiliation-title: "Quarter"
+format:
+ pdf:
+    code-fold: true
+    code-line-numbers: true
+    code-copy: true
+    code-tools: true
+    self-contained: true
+    toc: false
+    toc-location: left
+    number-sections: true
+    geometry: margin=0.2in
+
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message =  FALSE)
+knitr::opts_chunk$set(warning =  FALSE)
+knitr::opts_chunk$set(error =  FALSE)
+
+```
+
+
+
+:::callout
+<div style="text-align: center">
+<span style="color: blue;"> **STUDENT NAME **</span>
+</div>
+- Andres Ulloa
+- Saketh Ayinaparthi
+- Jerry Yan
+- Ivan Howes
+:::
+
+
+
+
+# Introduction
+The goal of this experiment is to see if UCSB's infamous party cuture makes a significant effect on student's academics. Our research question is: **Does regular partying behavior affect GPA among UCSB undergraduates, and does this effect differ by year in school?**
+
+We designed an experiment using a Randomized Complete Block Design (RCBD) and collected data from students across the UCSB campus on March 9, 2026. We analyzed whether students who party and take drugs regularly have different GPAs than students who don't, while blocking on year in school to account for any differences across class standing. We find this block to be reasonable as academic intensity and social standing change as students grow older. 
+
+
+# Experimental Design
+
+**Response variable:** GPA, collected in ranges from 0.0 to 4.0 (e.g., 3.0--3.5). We converted each range to its midpoint for analysis. For example, a student reporting 3.0--3.5 was assigned a GPA of 3.25. The possible values are 0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, and 3.75.
+
+**Treatment factor:** Partying behavior (Yes or No). This is a fixed factor with 2 levels. Students were asked whether they regularly party, defined as drinking, smoking, or using substances in large group settings at least once a week on average.
+
+**Blocking variable:** Year in school (1st Year, 2nd Year, 3rd Year, 4th Year). We treated year as a blocking factor to control for variability in GPA that might come from being further along in your degree. For instance, upper-division students may have different GPAs on average just because of course difficulty or time spent at the university. Year is treated as a fixed factor with 4 levels.
+
+**Design type:** We used a Randomized Complete Block Design (RCBD). The blocks are the four class years, and within each block, we observe students in both treatment groups (Party = Yes and Party = No). This allows us to separate the effect of partying from any baseline GPA differences across class years.
+
+**Model:**
+$$Y_{ij} = \mu + \tau_i + \beta_j + \epsilon_{ij}$$
+where $Y_{ij}$ is the GPA for a student in treatment $i$ (Party Yes/No) and block $j$ (Year 1st--4th), $\mu$ is the overall mean, $\tau_i$ is the treatment effect, $\beta_j$ is the block effect, and $\epsilon_{ij} \sim N(0, \sigma^2)$.
+
+**Randomization and replication:** We randomly selected participants by splitting up across four different areas of campus (UCen, Library/Arbor, near IV tunnel, Physical Sciences lawn) and approaching students in no set order. This gave us a mix of students across all four class years and both treatment groups. Each year/party combination has multiple observations (unequal cell sizes, ranging from about 5 to 30 per cell), giving us adequate replication. After removing graduate students and "Other" responses (exchange and visiting students), we had 153 total observations across 8 cells (4 years $\times$ 2 party levels).
+
+
+# Data Collection
+
+**Procedure:** On March 9, 2026, our group of four split up across different parts of campus to get a broad sample of UCSB undergraduate students. We each covered a different zone starting around 3:00 PM: one person was stationed at the UCen, one covered inside the Library as well as near the Arbor, one went to the edge of campus near the light tunnel, and one walked around the Physical Sciences lawn. Each of us approached students who were studying, hanging out, or passing through, and asked them to fill out a short Google Forms survey on their phone. If we approached a group, we asked each person to complete the form individually. We collected responses for about 1 and a half hours, finishing around 4:30 PM.
+
+**Survey questions:** The survey asked students their year, GPA range, and whether they regularly (at least once a week) drink alcohol, smoke weed, use nicotine, take other drugs, and party in large groups.
+
+**Challenges and adjustments:** A few things came up during data collection. In our original Google form, we did not ask about nicotine usage as we had intended to, so the data from those responses were lost. Some students were busy or didn't want to be interrupted, so we just moved on to the next person. We also had 3 graduate students and 2 "Other" respondents that we ended up dropping from the analysis since our blocking variable is based on undergraduate class year (1st through 4th). After removing these we ended up with 153 usable responses. 
+
+In our analysis afterwards, we found that having ranges of GPAs was difficult to use, so we use the midpoints of the ranges in reference to the possible responses.  
+
+**Data summary:**
+
+```{r, echo = FALSE}
+# GPA midpoints: 2.0-2.5 -> 2.25, 2.5-3.0 -> 2.75, 3.0-3.5 -> 3.25, 3.5-4.0 -> 3.75
+survey <- read.csv("survey_data.csv")
+survey$Year <- factor(survey$Year, levels = c("1st","2nd","3rd","4th"))
+survey$Party <- factor(survey$Party, levels = c("No","Yes"))
+
+cat("Total observations:", nrow(survey), "\n")
+cat("Observations per Year:\n")
+table(survey$Year)
+```
+
+```{r, echo = FALSE}
+library(knitr)
+
+summary_party <- aggregate(GPA ~ Party, data = survey,
+                           FUN = function(x) c(Mean = mean(x), SD = sd(x), N = length(x)))
+summary_party <- do.call(data.frame, summary_party)
+colnames(summary_party) <- c("Party", "Mean GPA", "SD", "N")
+kable(summary_party, digits = 3, caption = "GPA summary by partying status")
+```
+
+```{r, echo = FALSE}
+summary_year <- aggregate(GPA ~ Year, data = survey,
+                          FUN = function(x) c(Mean = mean(x), SD = sd(x), N = length(x)))
+summary_year <- do.call(data.frame, summary_year)
+colnames(summary_year) <- c("Year", "Mean GPA", "SD", "N")
+kable(summary_year, digits = 3, caption = "GPA summary by year in school")
+```
+
+```{r, echo = FALSE}
+year_party_tab <- table(survey$Year, survey$Party)
+kable(year_party_tab, caption = "Number of students per Year × Party cell")
+```
+
+```{r, echo = FALSE}
+library(ggplot2)
+
+ggplot(survey, aes(x = Party, y = GPA, fill = Party)) +
+  geom_boxplot() +
+  labs(title = "GPA Distribution by Partying Status",
+       x = "Do you party regularly?",
+       y = "GPA (midpoint)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("No" = "#4DAF4A", "Yes" = "#E41A1C")) +
+  theme(legend.position = "none")
+```
+
+```{r, echo = FALSE}
+ggplot(survey, aes(x = Year, y = GPA, fill = Party)) +
+  geom_boxplot() +
+  labs(title = "GPA Distribution by Year and Partying Status",
+       x = "Year in School",
+       y = "GPA (midpoint)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("No" = "#4DAF4A", "Yes" = "#E41A1C"))
+```
+
+
+# Analysis
+
+## Exploratory Data Analysis
+
+Looking at the boxplots, the GPA distributions for students who party and those who don't overlap quite a bit. The group means are very close (students who party have a mean GPA of about 3.53 compared to 3.52 for non-partiers), so there is essentially no visible difference between the two groups. The year-by-party boxplots show a similar story: within each class year the two groups look about the same, though the spread varies a bit depending on sample size in each cell.
+
+```{r, echo = FALSE}
+cell_means <- aggregate(GPA ~ Year + Party, data = survey, FUN = mean)
+cell_means_wide <- reshape(cell_means, idvar = "Year", timevar = "Party",
+                           direction = "wide")
+colnames(cell_means_wide) <- c("Year", "No Party", "Party")
+kable(cell_means_wide, digits = 3, caption = "Mean GPA by Year and Party status")
+```
+
+## Hypothesis Testing
+
+We test whether there is a significant difference in mean GPA between students who party and those who don't, while blocking on year.
+
+**Hypotheses for treatment (Party):**
+
+- $H_0$: $\tau_1 = \tau_2 = 0$ (no effect of partying on GPA)
+- $H_1$: At least one $\tau_i \neq 0$ (partying does affect GPA)
+
+**Hypotheses for block (Year):**
+
+- $H_0$: $\beta_1 = \beta_2 = \beta_3 = \beta_4 = 0$ (no difference across years)
+- $H_1$: At least one $\beta_j \neq 0$
+
+We use $\alpha = 0.05$ for all tests.
+
+```{r, echo = FALSE}
+fit <- aov(GPA ~ Party + Year, data = survey)
+summary(fit)
+```
+
+```{r, echo = FALSE}
+anova_table <- summary(fit)[[1]]
+kable(anova_table, digits = 4, caption = "ANOVA Table (RCBD)")
+```
+
+## Assumption Checking
+
+For the ANOVA results to be valid, we need to check:
+
+1. **Normality of residuals**
+2. **Constant variance (homogeneity)**
+3. **Independence of observations**
+
+```{r, echo = FALSE}
+qqnorm(residuals(fit), main = "Normal Q-Q Plot of Residuals")
+qqline(residuals(fit), col = "red")
+```
+
+```{r, echo = FALSE}
+shapiro.test(residuals(fit))
+```
+
+```{r, echo = FALSE}
+plot(fitted(fit), residuals(fit),
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted Values")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The Q-Q plot shows non-normality, which makes sense given that our GPA variable only takes four discrete values (2.25, 2.75, 3.25, 3.75) rather than being truly continuous. The Shapiro-Wilk test confirms this ($W = 0.793$, $p < 0.001$), rejecting the normality assumption. The residuals vs. fitted plot also shows a banded pattern because of the discrete GPA values. These are limitations of using categorical GPA ranges converted to midpoints rather than exact GPAs. Despite these violations, ANOVA is known to be fairly robust to non-normality, especially with a sample this large ($n = 153$). We proceed with the analysis but keep this caveat in mind when interpreting the results.
+
+Independence is reasonable since we approached different students individually, though students surveyed in groups might have correlated responses.
+
+## Post-hoc Analysis
+
+Since Year has 4 levels, we can use Tukey's HSD to see which years differ from each other in terms of GPA.
+
+```{r, echo = FALSE}
+TukeyHSD(fit, which = "Year")
+```
+
+```{r, echo = FALSE}
+plot(TukeyHSD(fit, which = "Year"), las = 1)
+```
+
+
+# Conclusions
+
+```{r, echo = FALSE}
+anova_res <- summary(fit)[[1]]
+party_f <- round(anova_res["Party", "F value"], 3)
+party_p <- round(anova_res["Party", "Pr(>F)"], 4)
+year_f <- round(anova_res["Year", "F value"], 3)
+year_p <- round(anova_res["Year", "Pr(>F)"], 4)
+
+mean_party <- mean(survey$GPA[survey$Party == "Yes"])
+mean_no <- mean(survey$GPA[survey$Party == "No"])
+
+results_df <- data.frame(
+  Party_F_value = party_f,
+  Party_p_value = party_p,
+  Year_F_value  = year_f,
+  Year_p_value  = year_p,
+  Mean_GPA_Party = round(mean_party, 3),
+  Mean_GPA_NoParty = round(mean_no, 3)
+)
+
+kable(results_df,
+      digits = 3,
+      caption = "ANOVA summary statistics")
+```
+
+Based on our RCBD ANOVA, the treatment factor Party had an F-statistic of `r party_f` with a p-value of `r party_p`. Since `r party_p` is well above our significance level of 0.05, we fail to reject the null hypothesis for Party. There is no statistically significant difference in mean GPA between students who party and those who don't. The mean GPAs back this up: `r round(mean_party, 3)` for partiers versus `r round(mean_no, 3)` for non-partiers, which is basically the same.
+
+The blocking variable Year had an F-statistic of `r year_f` and a p-value of `r year_p`. This is also above 0.05, so we fail to reject the null hypothesis for Year as well. GPA does not appear to differ significantly across class years in our sample. Tukey's HSD confirmed this, with none of the pairwise year comparisons reaching significance (all adjusted p-values > 0.05).
+
+{{< pagebreak >}}
+
+**Limitations:**
+
+There are several things that limit how much we can conclude from this study. First, the treatment factor (partying behavior) was not directly assigned by us. Students already fell into the "party" or "no party" group based on their existing habits, so we cannot make strong causal claims. It's possible that some third variable (like major, personality, or workload) explains both partying behavior and GPA.
+
+Second, GPA was collected as a range rather than an exact number, so we lose precision by converting to midpoints. This creates a discrete response variable with only 4 possible values, which violates the continuous response assumption of ANOVA to some degree.
+
+This study uses a cross-sectional design, with all data collected on a single afternoon. Even though we spread out across multiple locations, students on campus on a Monday afternoon are possibly more academically engaged on average, which could bias our sample toward higher GPAs.
+
+Finally, the definition of "partying" in our survey was broad (drinking, smoking, or using substances in large groups at least once a week). Students might interpret this differently, and the yes/no format doesn't capture how often or how intensely someone parties.
+
+**Possible improvements:** Future studies could collect exact GPAs or use smaller step sizes between GPAs. In our analysis, we agreed that our results may have been more conclusive if there was a distinction made within higher GPA ranges e.g 3.5 to 4.0 and 3.0 to 3.5. We could have also use stratified random sampling to ensure equal representation from each class year, include a measure of partying frequency rather than just yes/no, and survey students at different times of the week (not just a Monday afternoon) to get a more representative sample.
+
+
+# Appendices
+
+Full R code used for this analysis. The data is stored in `survey_data.csv`.
+
+```{r, eval=FALSE}
+# ---- Data Loading ----
+survey <- read.csv("survey_data.csv")
+survey$Year <- factor(survey$Year, levels = c("1st","2nd","3rd","4th"))
+survey$Party <- factor(survey$Party, levels = c("No","Yes"))
+
+# ---- Summary Statistics and Tables ----
+cat("Total observations:", nrow(survey), "\n")
+cat("Observations per Year:\n")
+table(survey$Year)
+
+library(knitr)
+summary_party <- aggregate(GPA ~ Party, data = survey,
+                           FUN = function(x) c(Mean = mean(x), SD = sd(x), N = length(x)))
+summary_party <- do.call(data.frame, summary_party)
+colnames(summary_party) <- c("Party", "Mean GPA", "SD", "N")
+kable(summary_party, digits = 3, caption = "GPA summary by partying status")
+
+summary_year <- aggregate(GPA ~ Year, data = survey,
+                          FUN = function(x) c(Mean = mean(x), SD = sd(x), N = length(x)))
+summary_year <- do.call(data.frame, summary_year)
+colnames(summary_year) <- c("Year", "Mean GPA", "SD", "N")
+kable(summary_year, digits = 3, caption = "GPA summary by year in school")
+
+year_party_tab <- table(survey$Year, survey$Party)
+kable(year_party_tab, caption = "Number of students per Year × Party cell")
+
+# ---- Plots ----
+library(ggplot2)
+
+ggplot(survey, aes(x = Party, y = GPA, fill = Party)) +
+  geom_boxplot() +
+  labs(title = "GPA Distribution by Partying Status",
+       x = "Do you party regularly?",
+       y = "GPA (midpoint)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("No" = "#4DAF4A", "Yes" = "#E41A1C")) +
+  theme(legend.position = "none")
+
+ggplot(survey, aes(x = Year, y = GPA, fill = Party)) +
+  geom_boxplot() +
+  labs(title = "GPA Distribution by Year and Partying Status",
+       x = "Year in School",
+       y = "GPA (midpoint)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("No" = "#4DAF4A", "Yes" = "#E41A1C"))
+
+# ---- RCBD ANOVA ----
+cell_means <- aggregate(GPA ~ Year + Party, data = survey, FUN = mean)
+cell_means_wide <- reshape(cell_means, idvar = "Year", timevar = "Party",
+                           direction = "wide")
+colnames(cell_means_wide) <- c("Year", "No Party", "Party")
+kable(cell_means_wide, digits = 3, caption = "Mean GPA by Year and Party status")
+
+fit <- aov(GPA ~ Party + Year, data = survey)
+summary(fit)
+
+anova_table <- summary(fit)[[1]]
+kable(anova_table, digits = 4, caption = "ANOVA Table (RCBD)")
+
+# ---- Assumptions ----
+qqnorm(residuals(fit), main = "Normal Q-Q Plot of Residuals")
+qqline(residuals(fit), col = "red")
+
+shapiro.test(residuals(fit))
+
+plot(fitted(fit), residuals(fit),
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted Values")
+abline(h = 0, col = "red", lty = 2)
+
+# ---- Post-hoc ----
+TukeyHSD(fit, which = "Year")
+
+plot(TukeyHSD(fit, which = "Year"), las = 1)
+
+# ---- Conclusions ----
+anova_res <- summary(fit)[[1]]
+party_f <- round(anova_res["Party", "F value"], 3)
+party_p <- round(anova_res["Party", "Pr(>F)"], 4)
+year_f <- round(anova_res["Year", "F value"], 3)
+year_p <- round(anova_res["Year", "Pr(>F)"], 4)
+
+mean_party <- mean(survey$GPA[survey$Party == "Yes"])
+mean_no <- mean(survey$GPA[survey$Party == "No"])
+
+results_df <- data.frame(
+  Party_F_value = party_f,
+  Party_p_value = party_p,
+  Year_F_value  = year_f,
+  Year_p_value  = year_p,
+  Mean_GPA_Party = round(mean_party, 3),
+  Mean_GPA_NoParty = round(mean_no, 3)
+)
+results_df
+```
+
+
+{{< pagebreak >}}
+
+
+**Secondary Findings**
+The following analysis is not apart of our official PSTAT 122 final project submission, but since we had the data, we thought it might be interesting for any readers. In a much less robust way than we tested the effects of partying on GPA, below our data do not show that consuming weed, alcohol, nicotine, or other drugs at least once a week on average has a significant effect on UCSB students' GPA. 
+
+
+```{r}
+#Data Manipulation
+data <- read.csv("UCSB Party Culture Survey.csv")
+
+data$X.Do.you.smoke.weed...At.least.once.a.week.on.average. <- factor(data$X.Do.you.smoke.weed...At.least.once.a.week.on.average., levels = c("No","Yes"))
+
+data$Do.you.drink...At.least.once.a.week.on.average. <- factor(data$Do.you.drink...At.least.once.a.week.on.average., levels = c("No","Yes"))
+
+data$Do.you.consume.nicotine...At.least.once.a.week.on.average. <- factor(data$Do.you.consume.nicotine...At.least.once.a.week.on.average., levels = c("No","Yes"))
+
+data$Do.you.take.any.other.drugs...At.least.once.a.week.on.average. <- factor(data$Do.you.take.any.other.drugs...At.least.once.a.week.on.average., levels = c("No","Yes"))
+
+data$X.GPA <- sapply(strsplit(data$X.GPA, " - "), function(x) {
+  mean(as.numeric(x))
+})
+
+#Analysis
+weed.lm = lm(data$X.GPA ~ data$X.Do.you.smoke.weed...At.least.once.a.week.on.average.)
+alc.lm = lm(data$X.GPA ~ data$Do.you.drink...At.least.once.a.week.on.average.)
+nic.lm = lm(data$X.GPA ~ data$Do.you.consume.nicotine...At.least.once.a.week.on.average.)
+drug.lm = lm(data$X.GPA ~ data$Do.you.take.any.other.drugs...At.least.once.a.week.on.average.)
+```
+```{r, echo=FALSE}
+library(broom)
+kable(tidy(weed.lm), digits = 3, caption = "Regression results: Weed use and GPA")
+kable(tidy(alc.lm), digits = 3, caption = "Regression results: Alcohol use and GPA")
+kable(tidy(nic.lm), digits = 3, caption = "Regression results: Nicotine use and GPA")
+kable(tidy(drug.lm), digits = 3, caption = "Regression results: Other drug use and GPA")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
